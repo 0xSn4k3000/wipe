@@ -1,0 +1,162 @@
+#!/bin/bash
+
+
+#-----------vars-------------
+args=("$@")
+
+directory=""
+overwrite_times=3
+dont_ask=0
+verbose=0
+#-----------functions-----------
+function checkargc()
+{
+
+    if [ $# -gt 0 ]
+    then
+        argc=1
+    else
+        argc=0
+        help miss
+    fi
+}
+
+function checkargs()
+{
+    if [ $argc -eq 1 ]
+    then
+        for (( i=0 ; i<$# ; i++ ))
+        do
+            arg=${args[$i]}
+
+            if [ -d $arg ]
+            then
+                directory=$arg
+            elif [ $arg = "-y" ]
+            then
+                dont_ask=1
+            elif [ $arg = "-v" ]
+            then
+                verbose=1 
+            elif [ $arg = "-n" ]
+            then
+                if [ ${args[$i+1]} -gt 0 ]
+                then
+                    overwrite_times=${args[$i+1]}
+                else
+                    help all
+                fi
+            elif [ $arg = "-h" ] || [ $arg = "--help" ]
+            then
+                help all
+            fi
+        done
+    fi
+
+}
+
+function basic_info()
+{
+    dirc=$(find $1 -type d | wc -l)
+    filec=$(find $1 -type f | wc -l)
+    total=$(( dirc + filec ))
+    echo "Dirs:"$dirc "  Files:"$filec "   Total:"$total "  Overwrite times:"$overwrite_times
+    start $args
+}
+
+function ask()
+{
+    if [ $dont_ask -ne 1 ]
+    then
+		while [ 1 ]
+		do
+	        read -p "$total of your content's will be wiped ,Are you sure?(y , n): " opt
+	        if [ $opt = "n" ] || [ $opt = "N" ]
+	        then
+	            exit
+			elif [ $opt = "y" ] || [ $opt = "Y" ]
+			then
+				break
+	        elif ! [ $opt = "y" ] || [ $opt = "Y" ] || [ $opt = "n" ] || [ $opt = "N" ]
+	        then
+            	echo "Please Enter y or n!"
+			
+			fi
+       	done 
+    fi
+}
+
+
+function start()
+{
+    ask
+    wipef
+    wiped
+}
+
+function wipef()
+{
+    files=($(find $directory -type f))
+    for (( i=0 ; i<filec ; i++))
+    do
+        shred -zuf -n $overwrite_times ${files[$i]}
+        if [ $verbose -eq 1 ]
+        then
+            echo "Wiped: " ${files[$i]}
+        fi
+    done
+}
+
+function wiped()
+{
+    dirs=($(find $directory -type d))
+    zeros=00
+    for (( i=$dirc-1 ; i>=0 ; i--))
+    do
+        mv -f ${dirs[$i]} $zeros
+        rm -rf $zeros
+        zeros+=00
+        if [ $verbose -eq 1 ]
+        then
+            echo "Wiped: " ${dirs[$i]}
+        fi
+    done
+}
+
+function help()
+{
+    if [ $1 = "miss" ]
+    then
+        echo "wipe: missing file operand"
+        echo "Try 'wipe -h' for more information"
+        exit
+    elif [ $1 = "all" ]
+    then
+        echo "Usage: wipe DIRECTORY [OPTIONS]"
+        echo "Options:
+        -y
+            ignore asking oprations
+        -n
+            overwrite times for files (default 3)
+        -v
+            explain what is being done
+
+ABOUT:
+        Facility of shred and remove directory and its contents
+        "
+        exit
+    fi
+
+}
+
+#-----------init----------
+
+checkargc $@
+checkargs $@
+
+if ! [ $(ls -d $directory) != "." ] && [ -d $directory ]
+then
+    echo "Directory doesn't exist!"
+else
+    basic_info $directory
+fi
